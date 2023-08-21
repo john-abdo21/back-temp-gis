@@ -36,6 +36,8 @@ def complex_Search(request):
             if data['toSearch'][item]:
                 item_to_search.append(item)
 
+        # Get variables each
+
         r_option = data['options']['river']
 
         r_distance_isset = r_option['distance']['isSet']

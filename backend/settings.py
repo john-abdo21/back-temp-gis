@@ -15,7 +15,7 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 REAL_BASE_DIR = Path(__file__).resolve().parent.parent.parent
-GDAL_LIBRARY_PATH = 'C:/OSGeo4W/bin/gdal307'
+GDAL_LIBRARY_PATH = '/usr/lib/grass78/lib/libgdal.so'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -143,5 +143,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
 "http://localhost:8080",
 "http://127.0.0.1:3000",
+"http://2.59.156.122:3000",
 "http://localhost:3000",
 ]
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '2.59.156.122']
+
