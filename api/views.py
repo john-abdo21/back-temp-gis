@@ -30,11 +30,41 @@ def complex_Search(request):
     elif request.method == 'POST':
         print('complex search',request.data)
         data = request.data.get('data')
+
+        land_option = data['landOption']
+        l_min_area = land_option['l_min_area']
+        l_max_area = land_option['l_max_area']
+        l_min_aed = land_option['l_min_aed']
+        l_max_aed = land_option['l_max_aed']
+
+        if l_min_area != '' or l_max_area != '':
+            if l_min_area == '':
+                sqlForRegions = '''
+                    SELECT ST_AsGeoJSON(ST_Union(ST_Transform(geom, 3857))) AS merged_geojson FROM pl_plot3857 WHERE area <= %(l_max_area)s;
+                '''
+                with connection.cursor() as cursor:
+                    cursor.execute(sqlForRegions,{'l_max_area': l_max_area})
+                    overlapping_regions = cursor.fetchall()
+            if l_max_area == '':
+                sqlForRegions = '''
+                    SELECT ST_AsGeoJSON(ST_Union(ST_Transform(geom, 3857))) AS merged_geojson FROM pl_plot3857 WHERE area >= %(l_min_area)s;
+                '''
+                with connection.cursor() as cursor:
+                    cursor.execute(sqlForRegions,{'l_min_area': l_min_area})
+                    overlapping_regions = cursor.fetchall()
+            else:
+                if l_min_area <= l_max_area:
+                    sqlForRegions = '''
+                        SELECT ST_AsGeoJSON(ST_Union(ST_Transform(geom, 3857))) AS merged_geojson FROM pl_plot3857 WHERE area >= %(l_min_area)s AND area <= %(l_max_area)s;
+                    '''
+                    with connection.cursor() as cursor:
+                        cursor.execute(sqlForRegions,{'l_max_area': l_max_area, 'l_min_area': l_min_area})
+                        overlapping_regions = cursor.fetchall()
         
-        item_to_search = []
-        for item in data['toSearch']:
-            if data['toSearch'][item]:
-                item_to_search.append(item)
+        # item_to_search = []
+        # for item in data['toSearch']:
+        #     if data['toSearch'][item]:
+        #         item_to_search.append(item)
 
         # Get variables each
 
@@ -121,9 +151,12 @@ def complex_Search(request):
             ) AS water_buffer
             ON ST_Intersects(pl_plot3857.geom, water_buffer.buffer_geom);
         '''
+
+
         with connection.cursor() as cursor:
-            cursor.execute(sqlForRegions,{'r_distance_maxdistance': r_distance_maxdistance,'r_length_minlength': r_length_minlength,'r_width_minwidth': r_width_minwidth})
+            cursor.execute(sqlForRegions,{'r_distance_maxdistance': r_distance_maxdistance, 'r_length_minlength': r_length_minlength, 'r_width_minwidth': r_width_minwidth})
             overlapping_regions = cursor.fetchall()
+
         print('overlapping_regions')
         return Response(overlapping_regions)
     
