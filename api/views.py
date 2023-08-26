@@ -63,6 +63,13 @@ def complex_Search(request):
         t_min_area = options['town']['minArea']
         t_max_area = options['town']['maxArea']
         t_hospital_exist = options['town']['hospital']
+        t_station_exist = options['town']['station']
+        t_hospital_distance = options['town']['hospitalDistance']
+        t_station_distance = options['town']['stationDistance']
+        t_school_distance = options['town']['schoolDistance']
+        t_hospital_label = options['town']['hospitalLabel']
+        t_station_label = options['town']['stationLabel']
+        t_school_label = options['town']['schoolLabel']
 
 
         # Transforming the data unit
@@ -86,11 +93,21 @@ def complex_Search(request):
 
         # SQL query generates
         sqlForRegions = ''''''
+        sqlSelectPart = '''
+            ST_AsGeoJSON(ST_Transform(geom, 3857))
+        '''
+        # if r_min_length or r_max_length:
+        #     sqlSelectPart += '''
+        #         ,buffer_geom
+        #     '''
+
         if l_min_area or l_max_area:
             if l_min_area == '':
                 sqlForRegions = '''
                     SELECT
-                        ST_AsGeoJSON(ST_Union(ST_Transform(geom, 3857)))
+                '''
+                sqlForRegions += sqlSelectPart
+                sqlForRegions += '''
                     AS
                         merged_geojson
                     FROM
@@ -107,13 +124,15 @@ def complex_Search(request):
             elif l_max_area == '':
                 sqlForRegions = '''
                     SELECT
-                        ST_AsGeoJSON(ST_Union(ST_Transform(geom, 3857)))
+                '''
+                sqlForRegions += sqlSelectPart
+                sqlForRegions += '''
                     AS
                         merged_geojson
                     FROM
                         pl_plot3857
                     INNER JOIN (
-                        SELECT ST_Buffer(ST_Union(ST_Transform(geom, 3857)), 0)
+                        SELECT ST_Buffer(ST_Transform(geom, 3857), 0)
                         AS in_distance
                         FROM pl_plot3857
                         WHERE area >= %(l_min_area)s
@@ -124,7 +143,9 @@ def complex_Search(request):
             elif l_min_area <= l_max_area:
                 sqlForRegions = '''
                     SELECT
-                        ST_AsGeoJSON(ST_Union(ST_Transform(geom, 3857)))
+                '''
+                sqlForRegions += sqlSelectPart
+                sqlForRegions += '''
                     AS
                         merged_geojson
                     FROM
@@ -270,7 +291,7 @@ def complex_Search(request):
                 '''
             sqlForRegions += '''
                 AS inlandwater_buffer
-                ON ST_Intersects(pl_plot3857.shape, inlandwater_buffer.inlandwater_buffer_shape)
+                ON ST_Intersects(pl_plot3857.geom, inlandwater_buffer.inlandwater_buffer_shape)
             '''
         
         f_where_SQL = ''''''
@@ -324,7 +345,38 @@ def complex_Search(request):
                 AS forest_buffer
                 ON ST_Intersects(pl_plot3857.geom, forest_buffer.forest_buffer_way)
             '''
-
+            
+        if t_hospital_label or t_station_label or t_school_label:
+            if t_hospital_distance:
+                sqlForRegions += '''
+                    INNER JOIN (
+                        SELECT ST_Buffer(ST_Union(ST_Transform(way, 3857)), %(t_hospital_distance)s) AS town_hospital_buffer_way
+                        FROM planet_osm_point
+                        WHERE amenity = "hospital"
+                    )
+                    AS town_hospital_buffer
+                    ON ST_Intersects(pl_plot3857.geom, town_hospital_buffer.town_hospital_buffer_way)
+                '''
+            if t_station_distance:
+                sqlForRegions += '''
+                    INNER JOIN (
+                        SELECT ST_Buffer(ST_Union(ST_Transform(way, 3857)), %(t_station_distance)s) AS town_station_buffer_way
+                        FROM planet_osm_point
+                        WHERE amenity = "bus_station"
+                    )
+                    AS town_station_buffer
+                    ON ST_Intersects(pl_plot3857.geom, town_station_buffer.town_station_buffer_way)
+                '''
+            if t_school_distance:
+                sqlForRegions += '''
+                    INNER JOIN (
+                        SELECT ST_Buffer(ST_Union(ST_Transform(way, 3857)), %(t_school_distance)s) AS town_school_buffer_way
+                        FROM planet_osm_point
+                        WHERE amenity LIKE "%_school"
+                    )
+                    AS town_school_buffer
+                    ON ST_Intersects(pl_plot3857.geom, town_school_buffer.town_school_buffer_way)
+                '''
         
         sqlForRegions += ''';'''
         with connection.cursor() as cursor:
@@ -345,6 +397,9 @@ def complex_Search(request):
                 'f_max_distance': f_max_distance,
                 'f_min_area': f_min_area,
                 'f_max_area': f_max_area,
+                't_hospital_distance': t_hospital_distance,
+                't_station_distance': t_station_distance,
+                't_school_distance': t_school_distance
             })
             overlapping_regions = cursor.fetchall()
         print('overlapping_regions')
@@ -613,11 +668,12 @@ def all_Search(request):
                 print("land_count1" ) 
             else:
                 sqlForLand = '''
-                        SELECT ST_AsGeoJSON(ST_Union(ST_Transform(geom, 3857))) AS merged_geojson FROM pl_plot3857 WHERE area >= %(p_Area_min)s;
+                        SELECT ST_AsGeoJSON(geom) FROM pl_plot3857 WHERE area >= %(p_Area_min)s;
                     '''
                 with connection.cursor() as cursor:
                     cursor.execute(sqlForLand, {'p_Area_min': p_area_min})
-                    landfilter = cursor.fetchone()[0]
+                    landfilter = cursor.fetchall()
+                    print(landfilter[0])
                 print("land_count1" ) 
             json_data = json.dumps({'key':'P','val':landfilter})
         return JsonResponse(json_data, safe=False)
